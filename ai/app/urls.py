@@ -15,11 +15,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.urls import path
-from .views import UserInputCreateAPIView, UserInputGenaiCreateAPIView, ChatGptApi
+from .views import UserInputCohereAPIView, UserInputGeminiCreateAPIView, ChatGpt4Api
 
 urlpatterns = [
     # path('admin/', admin.site.urls),
-    path('api/cohere/', UserInputCreateAPIView.as_view()),
-    path('api/ganai/', UserInputGenaiCreateAPIView.as_view()),
-    path('api/gpt/', ChatGptApi.as_view()),
+    path('api/cohere/', UserInputCohereAPIView.as_view()),
+    path('api/ganai/', UserInputGeminiCreateAPIView.as_view()),
+    path('api/gpt/', ChatGpt4Api.as_view()),
 ]

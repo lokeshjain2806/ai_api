@@ -22,6 +22,7 @@ class UserInputGenai(models.Model):
 
 class ChatGptModel(models.Model):
     user_message = models.TextField()
+    image = models.ImageField(upload_to='image/', null=True, blank=True)
     bot_message = models.TextField(verbose_name="Message", null=True, blank=True)
 
     def __str__(self):
