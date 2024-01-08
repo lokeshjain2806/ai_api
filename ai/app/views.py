@@ -12,7 +12,8 @@ from docx import Document
 from PyPDF2 import PdfReader
 from os.path import splitext
 
-co = cohere.Client('APIKEYY')
+
+co = cohere.Client('APIKEY')
 
 prompt = """Act as a Leadership Management Tutor working at Desklib (online study resources and Homework Help website). 
         Give an answer to the question asked in very brief, strictly under 300 words. Make sure to only answer if you are confident; otherwise, 
@@ -60,7 +61,8 @@ class UserInputCohereAPIView(CreateAPIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
-genai.configure(api_key="APIKEYY")
+
+genai.configure(api_key="APIKEY")
 
 
 class UserInputGeminiCreateAPIView(CreateAPIView):
@@ -69,6 +71,8 @@ class UserInputGeminiCreateAPIView(CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
+        # images = request.data.getlist('image')
+        # print(images,'cdnskjcndfvkcdfjnkjln')
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         user_message = validated_data.get('user_message', '')
@@ -99,8 +103,9 @@ class UserInputGeminiCreateAPIView(CreateAPIView):
             }
         ]
         if validated_data.get('image') is None:
-            docs = validated_data['document']
+            docs = validated_data.get('document')
             if docs:
+                docs = validated_data['document']
                 file_name, file_extension = splitext(docs.name.lower())
                 if file_extension == '.docx':
                     doc = Document(docs)
@@ -125,15 +130,34 @@ class UserInputGeminiCreateAPIView(CreateAPIView):
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.data)
         if validated_data.get('image') is not None and validated_data.get('user_message') is not None:
-            image = validated_data.get('image')
-            model = genai.GenerativeModel(model_name="gemini-pro-vision",
-                                          generation_config=generation_config,
-                                          safety_settings=safety_settings)
-            img = PIL.Image.open(image)
-            response = model.generate_content([prompt + '\n' + user_message, img], stream=True)
-            response.resolve()
-            validated_data['image'] = image
-            validated_data['bot_message'] = response.text
+            images = request.data.getlist('image')
+            # images = validated_data.getlist('image')
+            print(images, "images")
+            # model = genai.GenerativeModel(model_name="gemini-pro-vision",
+            #                               generation_config=generation_config,
+            #                               safety_settings=safety_settings)
+            # img = PIL.Image.open(image)
+            # response = model.generate_content([prompt + '\n' + user_message, img], stream=True)
+            # response.resolve()
+            # validated_data['image'] = image
+            # validated_data['bot_message'] = response.text
+            results = []
+
+            for image_path in images:
+                if image_path is not None:
+                    image = Image.open(image_path)
+                    model = genai.GenerativeModel(model_name="gemini-pro-vision",
+                                                  generation_config=generation_config,
+                                                  safety_settings=safety_settings)
+                    response = model.generate_content([prompt + '\n' + user_message, image], stream=True)
+                    response.resolve()
+
+                    result = {
+                        'bot_message': response.text
+                    }
+
+                    results.append(result)
+                validated_data['bot_message'] = results
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.data)
 
@@ -143,9 +167,7 @@ class UserInputGeminiCreateAPIView(CreateAPIView):
 from openai import OpenAI
 import openai
 import base64
-
-client = openai.Client(api_key="APIKEYY")
-
+client = openai.Client(api_key="APIKEY")
 def encode_image(image):
     if isinstance(image, InMemoryUploadedFile):
         image_content = image.read()
@@ -163,32 +185,42 @@ class ChatGpt4Api(CreateAPIView):
         validated_data = serializer.validated_data
         user_message = validated_data.get('user_message', '')
         image = validated_data.get('image')
+        results = []
         if image:
-            base64_image = encode_image(image)
+            images = request.data.getlist('image')
+            for image in images:
+                base64_image = encode_image(image)
 
-            response = client.chat.completions.create(
-                model="gpt-4-vision-preview",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": prompt,
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text":user_message},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}",
-                                    "detail": "high"
+                response = client.chat.completions.create(
+                    model="gpt-4-vision-preview",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": prompt,
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text":user_message},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{base64_image}",
+                                        "detail": "high"
+                                    },
                                 },
-                            },
-                        ],
-                    }
-                ],
-                max_tokens=300,
-            )
+                            ],
+                        }
+                    ],
+                    max_tokens=300,
+                )
+                result = {
+                    'bot_message': response.choices[0].message.content
+                }
+
+                results.append(result)
+            gpt3_response = results
+            print(results)
         else:
             conversation = [
                 {"role": "system", "content": prompt},
@@ -199,7 +231,7 @@ class ChatGpt4Api(CreateAPIView):
                 messages=conversation,
                 max_tokens=300,
             )
-        gpt3_response = response.choices[0].message.content
+            gpt3_response = response.choices[0].message.content
         validated_data['bot_message'] = gpt3_response
         chat_gpt_instance = ChatGptModel.objects.create(
             user_message=user_message,
